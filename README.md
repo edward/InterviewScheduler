@@ -10,16 +10,17 @@ Turn a bunch of emails for people who need to meet a single person across a sing
 
 ## Installation
 
-    $ bundle
-
+```shell
+$ bundle
+```
 
 ## Using/Developing
 
 1. Fire up the local web server:
 
-    $ ruby server.rb
+        $ ruby server.rb
 
-2. Visit http://localhost:4567
+2. Visit [http://localhost:4567](http://localhost:4567)
 3. Hit the Authenticate with Google button
 4. Type in some names
 5. Keep developing until the schedule pops out
