@@ -229,8 +229,14 @@ Add a handler to get the email addresses and calculate a schedule that works upo
       emailAddresses = getEmailAddresses()
       getBusyFree accessToken, emailAddresses, (busyFree) ->
         interviewers = busyFreeToInterviewers(busyFree)
-        console.log schedulesPossibleInNextWeek(interviewers)
-
+        schedules = schedulesPossibleInNextWeek(interviewers)
+        console.log schedules
+        for day in schedules
+          for slot in day
+            interviewer = slot.interviewer
+            dateTime = niceDateTimeFormat(new Date(slot.timeSlot))
+            $("#schedule-results").append "<tr><td>#{interviewer}</td> <td>#{dateTime}</td></tr>"
+        
 
 Some handy utility functions
 ----------------------------
@@ -248,6 +254,12 @@ Some handy utility functions
       date.setSeconds(0)
       date.setHours(24 * advance)
       date
+
+    niceDateTimeFormat = (date) ->
+      options = 
+        weekday: "long", day: "numeric", month: "long",
+        hour: "numeric", minute: "numeric", hour12: true
+      date.toLocaleString("en-CA", options)
 
 Some neato tests
 ----------------
