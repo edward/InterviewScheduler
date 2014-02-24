@@ -1,0 +1,3 @@
+#!/bin/sh
+cd public
+coffee -wcm javascripts/interview-scheduler.litcoffee
