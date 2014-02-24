@@ -10,14 +10,14 @@ Turn a bunch of emails for people who need to meet a single person across a sing
 
 ## Installation
 
-  $ bundle
+    $ bundle
 
 
 ## Using/Developing
 
 1. Fire up the local web server:
 
-  $ ruby server.rb
+    $ ruby server.rb
 
 2. Visit http://localhost:4567
 3. Hit the Authenticate with Google button
