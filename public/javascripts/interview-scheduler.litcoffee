@@ -127,7 +127,7 @@ Start with a function that tells me if one person is free at a time.
 
 I need to know what the day looks like in terms of 7 blocks of hour-long slots, representing the time between 10am and 5pm, which is usually when we conduct interviews. If any busy-times fall into one of these slots, then mark that slot as busy.
 
-    Interviewer::freeSlotsOn = (day) ->
+    Interviewer::busyFreeSlotsOn = (day) ->
       day = new Date(day)
       day.setMinutes(0)
       day.setSeconds(0)
@@ -137,68 +137,87 @@ I need to know what the day looks like in terms of 7 blocks of hour-long slots, 
         {free: @.isFreeAtTime(day), time: day.toString()}
       freeSlots
 
-    allFreeSlotsOn = (interviewers, day) ->
+    Interviewer::freeSlotsCount = (day) ->
+      freeSlots = (freeSlot for freeSlot in @.busyFreeSlotsOn(day) when freeSlot.free is true)
+      freeSlots.length
+
+    allBusyFreeSlotsOn = (day, interviewers) ->
       # returns an array of free/busy arrays
       for interviewer in interviewers
-        interviewer.freeSlotsOn(day)
+        interviewer.busyFreeSlotsOn(day)
 
-    slotsThatWork = (day, interviewers) ->
-      interviewers
-      workingSlots
+A cheap heuristic to see if this day works at all: check to see that each interviewer has at least one free slot and that there are at least as many free slots as interviewers requested
+
+    doesTodayWorkAtAll = (day, interviewers) ->
+      totalFreeSlots = 0
+      for interviewer in interviewers
+        freeSlots = interviewer.freeSlotsCount(day)
+        if freeSlots < 1
+          return false
+        totalFreeSlots = freeSlots + totalFreeSlots
+      return false if totalFreeSlots < interviewers.length
+
+      return true
 
 Go through each hour of the interviewing day and see if the currently inspected slot works for any interviewers
 
-      for timeframe in timeframes
-        for interviewer in interviewers
-          if doesTimeframeWork(interviewer, timeframe)
-            workingSlots << [timeframe, interviewer]
-            removeInterviewer(interviewer)
-            break
+    slotsThatWork = (day, interviewers) ->
+      return [] unless doesTodayWorkAtAll(day, interviewers)
 
-      return workingslots
-      # returns the slots that work matching with emails
+      timeSlots = (timeSlot.time for timeSlot in interviewers[0].busyFreeSlotsOn(day))
 
-    permutationsExhausted = ->
-      # fill this in?
+Look through each time slot and interviewer to see if there’s someone free at that time and mark them as such if so. Permute the order of interviewers if it doesn’t work.
 
-    permuteUntilSlotsWork = (interviewers) ->
-      slotsThatWork = []
-      permutations = 1
-      while (slotsThatWork.length == interviewers || permutationsExhausted(interviewers, permutations))
-        interviewers = permuteInterviewers(interviewers, permutations)
-        slotsThatWork = slotsThatWork(day, interviewers)
+      timeSlotsForGivenInterviewerPermutation = (day, interviewers) ->
+        interviewersAvailable = ({"interviewer": interviewer, "selected": false} for interviewer in interviewers)
+
+        workingSlots = []
+
+        for timeSlot in timeSlots
+          for interviewerSlot in interviewersAvailable
+            if (interviewerSlot.selected isnt true) && interviewerSlot.interviewer.isFreeAtTime(timeSlot)
+              workingSlots.push {"timeSlot": timeSlot, "interviewer": interviewerSlot.interviewer.email}
+
+              interviewerSlot.selected = true
+              break
+          break if workingSlots.length is interviewers.length
+
+        workingSlots
+
+      allPermutations = (input) ->
+        # Adapted from http://stackoverflow.com/questions/9960908/permutations-in-javascript
+        permArr = []
+        usedElements = []
+
+        permute = (input) ->
+          i = 0
+          while i < input.length
+            element = input.splice(i, 1)[0]
+            usedElements.push element
+            permArr.push usedElements.slice() if input.length is 0
+            permute input
+            input.splice i, 0, element
+            usedElements.pop()
+            i++
+          permArr
+        permute(input)
+
+Look at each of the possible non-repeated orderings of interviewers to see if there’s a fit for the day:
+
+      for interviewerOrder in allPermutations(interviewers)
+        timeSlots = timeSlotsForGivenInterviewerPermutation(day, interviewerOrder)
+        return timeSlots if timeSlots.length is interviewers.length
+
+      return []
 
 
-    # comingWeek = []
-    # today = new Date()
-    # for i in [0..6] by 1
-    #   comingWeek.push nextDay(today, i)
+    schedulesPossibleInNextWeek = (interviewers) ->
+      today = new Date()
+      comingWeek = for i in [0..6]
+        nextDay(today, i)
 
-    # interviewers = ['...']
-
-    # for day in comingWeek
-    #   workingSlots = permuteUntilSlotsWork(day, interviewers)
-    #   # print workingSlots
-
-Then walk through each hour of the day starting from 10am to see if a person is free at that time. If someone is, then remove them from the list of people you’re trying to fit into a day.
-
-Try all permutations of order of people you have in the list to determine if a day can work, but stop as soon as it does.
-
-Hmm... there must be a better way.
-
-What if I were to represent each person’s schedule as a simplified array of hour blocks of the day, from 10am to 5pm, so 7 blocks. I mark the available slots, and then put the arrays next to each other, and then walk a path through the resulting graph and then back track when I have a problem. (This still feels very costly.)
-
-Is there a way to use another dimension to better optimize the algorithm? Can I somehow stack the time slots on top of each other and see things topographically to see if a combination is even possible at all?
-
-That could be interesting – first start out by looking to see everyone’s schedule for a day to count the free slots of an hour. If there are fewer than the number of interviewers, then reject the day immediately.
-
-Ok, let’s try that approach:
-
-1. Count free slots for each person. Reject if # free slots < # interviewers
-2. Fit the first free
-3. If the first tree fails, permute (or I bet I could just shuffle the interviewers) until it works or I exhaust the possibilities
-
-This feels a lot like the 8 queens problem.
+      for day in comingWeek
+        workingSlots = slotsThatWork(day, interviewers)
 
 
 Putting it all together
@@ -209,14 +228,15 @@ Add a handler to get the email addresses and calculate a schedule that works upo
     $("#go").click ->
       emailAddresses = getEmailAddresses()
       getBusyFree accessToken, emailAddresses, (busyFree) ->
-        console.log busyFreeToInterviewers(busyFree)
+        interviewers = busyFreeToInterviewers(busyFree)
+        console.log schedulesPossibleInNextWeek(interviewers)
 
 
 Some handy utility functions
 ----------------------------
 
     assert = (condition, message) ->
-      (throw message || "Assertion failed") && debugger unless condition
+      throw message || "Assertion failed" unless condition
 
     assertEqual = (expected, actual, message) ->
       throw message || console.log "Assertion failed; expected #{expected} but was #{actual}" unless expected is actual
@@ -231,6 +251,8 @@ Some handy utility functions
 
 Some neato tests
 ----------------
+
+Test conversion of busy/free data to Interviewer objects
 
     exampleJSONresponseToBusyFree = '''
     {
@@ -257,14 +279,18 @@ Some neato tests
     assert interviewers[0].busy[0].start is "2013-12-02T15:00:00Z"
     assert interviewers[0].busy[0].end is "2013-12-02T15:15:00Z"
 
+Test that Interviewer objects (an Interviewer) know if they are free at a given time
+
     interviewer = interviewers[0]
     busyTime = "2013-12-02T15:00:00Z"
     freeTime = nextDay(busyTime, 1)
     assert !interviewer.isFreeAtTime(busyTime)
     assert interviewer.isFreeAtTime(freeTime)
 
+Test that an Interviewer can produce a list of time slots of when it is busy/free for a given day
+
     givenDay = "2013-12-02T15:00:00Z"
-    knownFreeSlots = [
+    knownBusyFreeSlots = [
       {"free": false, "time": "Mon Dec 02 2013 10:00:00 GMT-0500 (EST)"},
       {"free": true, "time": "Mon Dec 02 2013 11:00:00 GMT-0500 (EST)"},
       {"free": true, "time": "Mon Dec 02 2013 12:00:00 GMT-0500 (EST)"},
@@ -274,7 +300,65 @@ Some neato tests
       {"free": true, "time": "Mon Dec 02 2013 04:00:00 GMT-0500 (EST)"}
     ]
 
-    freeSlots = interviewer.freeSlotsOn(givenDay)
+    freeSlots = interviewer.busyFreeSlotsOn(givenDay)
     for slot, i in freeSlots
-      assert slot.free is knownFreeSlots[i].free
-    
+      assert slot.free is knownBusyFreeSlots[i].free
+
+Test that an Interviewer can tell you how many free slots they have for a given day
+
+    givenDay = "2013-12-02T15:00:00Z"
+    freeSlotsCount = interviewer.freeSlotsCount(givenDay)
+    assert freeSlotsCount is 6
+
+Test that we can tell early-on if a day is even scheduleable at all
+
+    assert doesTodayWorkAtAll(givenDay, [interviewer])
+
+    exampleSuperBusyDayJSONresponseToBusyFree = '''
+    {
+      "kind": "calendar#freeBusy",
+      "timeMin": "2013-11-30T05:00:00.000Z",
+      "timeMax": "2013-12-07T05:00:00.000Z",
+      "calendars": {
+        "interviewer@email.com": {
+          "busy": [
+            {
+              "start": "2013-12-02T15:00:00Z",
+              "end": "2013-12-02T23:15:00Z"
+            }
+          ]
+        }
+      }
+    }
+    '''
+    exampleSuperBusy = JSON.parse(exampleSuperBusyDayJSONresponseToBusyFree)
+
+    busyInterviewer = busyFreeToInterviewers(exampleSuperBusy)[0]
+
+    assert !doesTodayWorkAtAll(givenDay, [busyInterviewer])
+
+Test that given two Interviewers both busy in the morning but free later on a particular day that a working meeting schedule will be produced
+
+    workingSlots = slotsThatWork(givenDay, [interviewer, interviewer])
+    assert workingSlots[0].timeSlot is "Mon Dec 02 2013 11:00:00 GMT-0500 (EST)"
+    assert workingSlots[1].timeSlot is "Mon Dec 02 2013 12:00:00 GMT-0500 (EST)"
+
+Test that given two Interviewers with schedules that look like the following, that a working schedule is still produced
+
+interviewer 1: 10am busy | 11am free
+interviewer 2: 10am free | 11am busy
+
+
+
+
+
+More thoughts on the fitting/optimization problem here
+------------------------------------------------------
+
+There must be a better way.
+
+What if I were to represent each person’s schedule as a simplified array of hour blocks of the day, from 10am to 5pm, so 7 blocks. I mark the available slots, and then put the arrays next to each other, and then walk a path through the resulting graph and then back track when I have a problem. (This still feels very costly.)
+
+Is there a way to use another dimension to better optimize the algorithm? Can I somehow stack the time slots on top of each other and see things topographically to see if a combination is even possible at all?
+
+This feels a lot like the 8 queens problem.
