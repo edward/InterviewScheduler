@@ -96,8 +96,6 @@ Asking Google for when people are busy/free
         url: url,
         data: JSON.stringify(data),
         success: (json) ->
-          console.log "Check out this awesome busy/free list:"
-          console.log json
           callback(json)
         dataType: 'json',
         contentType: 'application/json'
@@ -137,16 +135,12 @@ I need to know what the day looks like in terms of 7 blocks of hour-long slots, 
       freeSlots = for advanceHour in [0...7]
         day.setHours(10 + advanceHour)
         {free: @.isFreeAtTime(day), time: day.toString()}
-      console.log freeSlots
       freeSlots
 
-    allSlots = (emails) ->
+    allFreeSlotsOn = (interviewers, day) ->
       # returns an array of free/busy arrays
-
-    countAvailableSlots = (freeBusySlots) ->
-      # returns number of available slots
-
-Maybe keep freeBusySlots as an object that also links to names?
+      for interviewer in interviewers
+        interviewer.freeSlotsOn(day)
 
     slotsThatWork = (day, interviewers) ->
       interviewers
@@ -174,17 +168,17 @@ Go through each hour of the interviewing day and see if the currently inspected 
         interviewers = permuteInterviewers(interviewers, permutations)
         slotsThatWork = slotsThatWork(day, interviewers)
 
-    someStuff = ->
-      comingWeek = []
-      today = new Date()
-      for i in [0..6] by 1
-        comingWeek.push nextDay(today, i)
 
-      interviewers = ['...']
+    # comingWeek = []
+    # today = new Date()
+    # for i in [0..6] by 1
+    #   comingWeek.push nextDay(today, i)
 
-      for day in comingWeek
-        workingSlots = permuteUntilSlotsWork(day, interviewers)
-        # print workingSlots
+    # interviewers = ['...']
+
+    # for day in comingWeek
+    #   workingSlots = permuteUntilSlotsWork(day, interviewers)
+    #   # print workingSlots
 
 Then walk through each hour of the day starting from 10am to see if a person is free at that time. If someone is, then remove them from the list of people you’re trying to fit into a day.
 
@@ -222,7 +216,7 @@ Some handy utility functions
 ----------------------------
 
     assert = (condition, message) ->
-      throw message || ("Assertion failed") unless condition
+      (throw message || "Assertion failed") && debugger unless condition
 
     assertEqual = (expected, actual, message) ->
       throw message || console.log "Assertion failed; expected #{expected} but was #{actual}" unless expected is actual
@@ -283,5 +277,4 @@ Some neato tests
     freeSlots = interviewer.freeSlotsOn(givenDay)
     for slot, i in freeSlots
       assert slot.free is knownFreeSlots[i].free
-
-    assert [] is interviewer.freeSlotsOn(givenDay)
+    
